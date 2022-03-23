@@ -4,11 +4,10 @@ from scipy.stats import loguniform
 class lambda_prior:
     """
     This example class defines an example prior class to handle both evaluations and 
-    sampling of the prior. This samples a slope (a), an intercept (b) and the standard-deviation (sigma) of 
-    the data.
+    sampling of the prior. This samples values for the slope of pixels in an image. 
     """
 
-    def sample(self, nsamples=None, ngroups=None):
+    def sample(self, nsamples=None):
         """
         Function that sample points from the prior. Uniform for the slope and intercept --- log-uniform for the standard-deviation.
         """
@@ -16,7 +15,7 @@ class lambda_prior:
             nsamples = self.nsamples
 
         # Evaluate samples:
-        lambda_samples = np.random.uniform(self.a1, self.a2, nsamples*ngroups)
+        lambda_samples = np.random.uniform(self.l1, self.l2, nsamples*self.ngroups)
 
         # Return them:
         return lambda_samples
@@ -31,7 +30,7 @@ class lambda_prior:
         lamb = theta
 
         # Validate the uniform priors:
-        if lamb <= self.l1 or a >= self.l2:
+        if lamb <= self.l1 or lamb >= self.l2:
             return False
 
         # If all is good, return a nice True:
@@ -48,7 +47,7 @@ class lambda_prior:
         return self.lamb_prior
 
 
-    def __init__(self, l1 = 0, l2 = 5000, nsamples = 100):
+    def __init__(self, l1 = 0, l2 = 5000, nsamples = 9, ngroups=5):
 
         # Define hyperparameters of the prior. First for slope (a, uniform prior):
         self.l1 = l1
@@ -59,6 +58,9 @@ class lambda_prior:
 
         # Define the default number of samples:
         self.nsamples = nsamples
+
+        # Define the number of groups
+        self.ngroups = ngroups
 
 class example_simulator:
     """
