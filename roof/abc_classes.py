@@ -123,21 +123,24 @@ class slope_simulator:
         self.pixc = pixc
         self.pixr = pixr
 
-
 class example_distance:
     """
     Example class for distance.
     """
-    def single_distance(self, simulation):
+    def slopes_distance(self,simulation):
         """ Given a dataset and a simulation, this function returns the distance 
-            between them. This is defined here as the distance to the slope, intercept and 
-            total variance of residuals """ 
+            between them. This is defined here as the least square distance between the
+            simulations and data points """ 
 
-        sim_a, sim_b = np.polyfit(self.xdata, simulation, 1)
-        sim_residual_variance = np.var(simulation - (sim_a * self.xdata + sim_b))
-        return np.abs( (sim_a - self.data_a) / self.data_a) + \
-               np.abs( (sim_b - self.data_b) / self.data_b ) + \
-               np.abs( (sim_residual_variance - self.data_residual_variance) / self.data_residual_variance )
+        sim_slopes = [np.polyfit(self.xdata,ramp,1)[0] for ramp in simulation]
+        return np.sum([np.abs(self.yslopes[i] - sim_slopes[i]) / self.data_slope[i] for i in range(self.ngroups)])
+
+    def counts_distance(self,simulation):
+        """ Given a dataset and a simulation, this function returns the distance 
+            between them. This is defined here as the distance between the simulated and data points"""
+
+        return np.sum([((self.ydata[i] - simulation[i])/self.data[i])**2 for i in range(self.ngroups)]) 
+
 
     def several_distances(self, simulations):
         """ Same as single distance, several times """
@@ -145,13 +148,16 @@ class example_distance:
         nsimulations = simulations.shape[0]
         distances = np.zeros(nsimulations)
         for i in range(nsimulations):
-            distances[i] = self.single_distance(simulations[i,:])
+            if self.distance_fnc = 'slopes':
+                distances[i] = self.slopes_distance(simulation)
+            elif self.distance_fnc = 'counts':
+                distances[i] = self.counts_distance(simulation)
         return distances
 
-    def __init__(self, ydata, length = 1000):
+    def __init__(self, ydata,distance_fn):
 
         self.xdata = np.linspace(-5, 5, length)
         self.ydata = ydata
+        self.data_slopes = [np.polyfit(self.xdata,ramp,1)[0] for ramp in simulation]
 
-        self.data_a, self.data_b = np.polyfit(self.xdata, self.ydata, 1)
-        self.data_residual_variance = np.var(self.ydata - (self.data_a * self.xdata + self.data_b))
+        self.distance_fn = distance_fn
