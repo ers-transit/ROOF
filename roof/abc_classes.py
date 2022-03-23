@@ -1,7 +1,11 @@
 import numpy as np
 from scipy.stats import loguniform
 
-class lambda_prior:
+from stochastic.processes.noise import ColoredNoise
+
+from . import utils
+
+class slope_prior:
     """
     This example class defines an example prior class to handle both evaluations and 
     sampling of the prior. This samples values for the slope of pixels in an image. 
@@ -15,10 +19,10 @@ class lambda_prior:
             nsamples = self.nsamples
 
         # Evaluate samples:
-        lambda_samples = np.random.uniform(self.l1, self.l2, nsamples*self.ngroups)
+        slope_samples = [np.random.uniform(self.s1, self.s2, nsamples) for i in range(9)]
 
         # Return them:
-        return lambda_samples
+        return slope_samples
 
     def validate(self, theta):
         """
@@ -27,11 +31,12 @@ class lambda_prior:
         """
 
         # Extract current parameters to evaluate the priors on:
-        lamb = theta
+        slopes = theta
 
         # Validate the uniform priors:
-        if lamb <= self.l1 or lamb >= self.l2:
-            return False
+        for slope in slopes:
+            if slope <= self.s1 or slope >= self.s2:
+                return False
 
         # If all is good, return a nice True:
         return True
@@ -44,25 +49,22 @@ class lambda_prior:
         """
 
         # Return the prior evaluated on theta:
-        return self.lamb_prior
+        return self.slope_prior * 9
 
 
-    def __init__(self, l1 = 0, l2 = 5000, nsamples = 9, ngroups=5):
+    def __init__(self, s1=0, s2=5000, nsamples=9):
 
         # Define hyperparameters of the prior. First for slope (a, uniform prior):
-        self.l1 = l1
-        self.l2 = l2
+        self.s1 = s1
+        self.s2 = s2
 
         # Value of the prior given hyperparameters:
-        self.lamb_prior = 1. / (l2 - l1)
+        self.slope_prior = 1. / (s2 - s1)
 
         # Define the default number of samples:
         self.nsamples = nsamples
 
-        # Define the number of groups
-        self.ngroups = ngroups
-
-class example_simulator:
+class slope_simulator:
     """
     This example class generates a simulator object that is able to simulate several or 
     single simulations. Simulates same data as the one in the `gen_fake_data()` function.
@@ -71,30 +73,56 @@ class example_simulator:
     def single_simulation(self, parameters):
 
         # Extract parameters:
-        a, b, sigma = parameters
+        slopes = parameters
 
-        return a * self.x + b + np.random.normal(0, sigma, self.length)
+        simulated_groups = np.zeros([self.ngroups, self.rows, self.columns])
+        # Add the 1/f noise to the group images
+        for i in range(self.ngroups):
+            _, _, simulated_groups[i, :, :] = utils.generate_detector_ts(self.beta, self.sigma_w, self.sigma_flicker, columns=self.columns, rows = self.rows)
+
+        # Now add the slopes for each pixel we're interested in
+        s = 0 # Counter for the slopes we're on
+        for pc in self.pixc: 
+            for pr in self.pixr:
+                # Generate the ramp for this pixel
+                ramp = utils.gen_ramp(slope = slopes[s], ngroups=self.ngroups, gain = self.gain, frametime = self.frametime)
+
+                for i in range(self.ngroups):
+                    # Now add this ramp to simulations of the 1/f noise to simulate an integration:
+                    simulated_groups[i, pr, pc] += ramp[i]
+
+            s+=1
+
+        return simulated_groups[:,self.pixr[0]:self.pixr[-1]+1,self.pixc[0]:self.pixc[-1]+1], simulated_groups
 
     def several_simulations(self, parameters):
 
         # Extract parameters:
-        all_as, all_bs, all_sigmas = parameters
-        nsamples = len(all_sigmas)
+        all_params = parameters
+        nsamples = len(all_params)
 
         # Define array to store simulations:
         simulations = np.zeros([nsamples, self.length])
 
         # Lazy loop to do several of these; could apply multi-processing:
         for i in range(nsamples):
-            simulations[i,:] = self.single_simulation([all_as[i], all_bs[i], all_sigmas[i]])
+            simulations[i,:] = self.single_simulation(all_params[i])
 
         return simulations
 
-
-    def __init__(self, length = 1000):
+    def __init__(self, length = 1000, ngroups=5, rows=32, columns=512, beta=1 , sigma_w=10 , sigma_flicker=10 , gain=1.42 , frametime=0.902, pixc=[255,256,257], pixr=[16,17,18]):
         self.length = length
-        self.x = np.linspace(-5, 5, self.length)
-        self.dataset_length = len(self.x)
+        self.ngroups = ngroups
+        self.rows = rows
+        self.columns = columns
+        self.beta = beta
+        self.sigma_w = sigma_w
+        self.sigma_flicker = sigma_flicker
+        self.gain = gain
+        self.frametime = frametime
+        self.pixc = pixc
+        self.pixr = pixr
+
 
 class example_distance:
     """
